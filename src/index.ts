@@ -81,6 +81,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
             content: [{ type: "text", text: `Error: ${response.statusText}` }],
           };
         }
+        // hello
 
         const data = await response.json();
         return {
