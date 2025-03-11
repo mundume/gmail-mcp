@@ -32,7 +32,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
       {
         name: "listEmails",
         description: "List emails from Gmail",
-        inputSchema: {},
+        inputSchema: { type: "object", properties: {} },
       },
     ],
   };
