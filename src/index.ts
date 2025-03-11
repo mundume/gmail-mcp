@@ -45,20 +45,6 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         return { content: [{ type: "text", text: "API Key not set." }] };
       }
 
-      const schema = z.object({
-        query: z.string().optional(),
-      });
-
-      try {
-        schema.parse(request.params.arguments);
-      } catch (error: any) {
-        return {
-          content: [
-            { type: "text", text: `Validation Error: ${error.message}` },
-          ],
-        };
-      }
-
       try {
         const url = `https://gmail.googleapis.com/gmail/v1/users/${GMAIL_USER_ID}/messages?maxResults=10`;
 
