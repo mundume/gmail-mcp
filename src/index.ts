@@ -27,18 +27,12 @@ const server = new Server(
 );
 
 server.setRequestHandler(ListToolsRequestSchema, async () => {
-  const emailListSchema = z
-    .object({
-      query: z.string().optional(),
-    })
-    .describe("Email Listing Parameters");
-
   return {
     tools: [
       {
         name: "listEmails",
         description: "List emails from Gmail",
-        inputSchema: zodToJsonSchema(emailListSchema), // Convert Zod to JSON Schema
+        inputSchema: {},
       },
     ],
   };
@@ -65,12 +59,8 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         };
       }
 
-      const { query } = request.params.arguments as { query?: string };
-
       try {
-        const url = `https://gmail.googleapis.com/gmail/v1/users/${GMAIL_USER_ID}/messages${
-          query ? `?q=${encodeURIComponent(query)}` : ""
-        }`;
+        const url = `https://gmail.googleapis.com/gmail/v1/users/${GMAIL_USER_ID}/messages?maxResults=10`;
 
         const response = await fetch(url, {
           headers: { Authorization: `Bearer ${GMAIL_API_KEY}` },
@@ -81,7 +71,6 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
             content: [{ type: "text", text: `Error: ${response.statusText}` }],
           };
         }
-        // hello
 
         const data = await response.json();
         return {
