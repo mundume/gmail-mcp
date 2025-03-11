@@ -30,8 +30,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
     tools: [
       {
         name: "listEmails",
-        description:
-          "List emails from Gmail with subject, sender, and body in Markdown format.",
+        description: "List emails from Gmail with subject, sender, and body.",
         inputSchema: { type: "object", properties: {} },
       },
     ],
@@ -87,7 +86,10 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           if (!messageResponse.ok) {
             return {
               content: [
-                { type: "text", text: `Error: ${messageResponse.statusText}` },
+                {
+                  type: "text",
+                  text: `Error: ${messageResponse.statusText}`,
+                },
               ],
             };
           }
@@ -96,15 +98,11 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           emailMessages.push(await parseMessage(fullMessage));
         }
 
-        // Format to Markdown
-        let markdownOutput = "";
-        emailMessages.forEach((email) => {
-          markdownOutput += `**Subject:** ${email.subject}\n`;
-          markdownOutput += `**From:** ${email.from}\n`;
-          markdownOutput += `**Body:**\n${email.body}\n\n---\n\n`; // Separator
-        });
-
-        return { content: [{ type: "text", text: markdownOutput }] };
+        return {
+          content: [
+            { type: "text", text: JSON.stringify(emailMessages, null, 2) },
+          ],
+        };
       } catch (error: any) {
         return { content: [{ type: "text", text: `Error: ${error.message}` }] };
       }
@@ -116,11 +114,11 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
 async function parseMessage(message: {
   payload: {
-    headers: { name: string; value: string }[];
-    parts: { mimeType: string; body: { data: WithImplicitCoercion<string> } }[];
+    headers: any;
+    parts: any[];
     body: { data: WithImplicitCoercion<string> };
   };
-  id: string;
+  id: any;
 }) {
   const headers = message.payload.headers;
   const subject = headers.find(
