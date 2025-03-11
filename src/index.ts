@@ -47,7 +47,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       try {
         // 1. Get List of Messages
         const messageListResponse = await fetch(
-          `https://gmail.googleapis.com/gmail/v1/users/${GMAIL_USER_ID}/messages?maxResults=10`,
+          `https://gmail.googleapis.com/gmail/v1/users/${GMAIL_USER_ID}/messages?maxResults=3`,
           {
             headers: { Authorization: `Bearer ${GMAIL_API_KEY}` },
           }
