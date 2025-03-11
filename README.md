@@ -1,5 +1,6 @@
 # gmail-mcp MCP Server
 
+[![smithery badge](https://smithery.ai/badge/@mundume/gmail-mcp)](https://smithery.ai/server/@mundume/gmail-mcp)
 a gmail mcp server built on top of typescript and the gmail api
 
 This is a TypeScript-based MCP server that implements a simple notes system. It demonstrates core MCP concepts by providing:
@@ -44,6 +45,15 @@ npm run watch
 
 ## Installation
 
+### Installing via Smithery
+
+To install Gmail Notes Server for Claude Desktop automatically via [Smithery](https://smithery.ai/server/@mundume/gmail-mcp):
+
+```bash
+npx -y @smithery/cli install @mundume/gmail-mcp --client claude
+```
+
+### Installing Manually
 To use with Claude Desktop, add the server config:
 
 On MacOS: `~/Library/Application Support/Claude/claude_desktop_config.json`
