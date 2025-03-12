@@ -8,12 +8,20 @@ import {
 } from "@modelcontextprotocol/sdk/types.js";
 import { WithImplicitCoercion } from "buffer";
 import * as dotenv from "dotenv";
-import { number, z } from "zod";
+import { z } from "zod";
 import { zodToJsonSchema } from "zod-to-json-schema";
 dotenv.config();
 
 const GMAIL_API_KEY = process.env.GMAIL_API_KEY;
 const GMAIL_USER_ID = process.env.GMAIL_USER_ID || "me";
+
+const EmailContentSchema = z.object({
+  emailIndex: z
+    .number()
+    .int()
+    .min(1)
+    .describe("The index of the email to retrieve (1 for the first email)."),
+});
 
 const server = new Server(
   {
@@ -32,22 +40,16 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
     tools: [
       {
         name: "listEmails",
-        description: "List the first 10 emails in your Gmail account.",
+        description:
+          "Retrieve the full content of a single email from Gmail based on its index.",
         inputSchema: { type: "object", properties: {} },
       },
       {
         name: "getEmailContent",
-        description:
-          "Retrieve the full content of an email from Gmail by its index.",
+        description: "Retrieve the full content of an email from Gmail.",
         inputSchema: {
           type: "object",
-          properties: {
-            emailIndex: {
-              type: "number",
-              description:
-                "The index of the email to retrieve (1 for the first email).",
-            },
-          },
+          properties: zodToJsonSchema(EmailContentSchema),
         },
       },
     ],
@@ -117,8 +119,9 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       }
 
       try {
-        // @ts-expect-error
-        const { emailIndex } = request.params.input;
+        const { emailIndex } = EmailContentSchema.parse(
+          request.params.input || 1
+        );
 
         // 1. Get List of Message IDs (up to the requested index)
         const messageListResponse = await fetch(
