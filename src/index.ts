@@ -111,7 +111,9 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       if (!GMAIL_API_KEY) {
         return { content: [{ type: "text", text: "API Key not set." }] };
       }
-      const { messageId } = getEmailContentSchema.parse(request.params.input);
+      const { messageId } = getEmailContentSchema.parse(
+        request.params.arguments
+      );
 
       try {
         const messageResponse = await fetch(
