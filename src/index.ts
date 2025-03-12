@@ -30,8 +30,23 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
     tools: [
       {
         name: "listEmails",
-        description: "List emails from Gmail with subject, sender, and body.",
+        description:
+          "List emails from Gmail with subject, sender, and body in Markdown format.",
         inputSchema: { type: "object", properties: {} },
+      },
+      {
+        name: "getEmailContent",
+        description: "Retrieve the full content of an email from Gmail.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            messageId: {
+              type: "string",
+              description: "The ID of the email to retrieve.",
+            },
+          },
+          required: ["messageId"],
+        },
       },
     ],
   };
@@ -86,10 +101,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           if (!messageResponse.ok) {
             return {
               content: [
-                {
-                  type: "text",
-                  text: `Error: ${messageResponse.statusText}`,
-                },
+                { type: "text", text: `Error: ${messageResponse.statusText}` },
               ],
             };
           }
@@ -98,10 +110,46 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           emailMessages.push(await parseMessage(fullMessage));
         }
 
+        // Format to Markdown
+        let markdownOutput = "";
+        emailMessages.forEach((email) => {
+          markdownOutput += `**Subject:** ${email.subject}\n`;
+          markdownOutput += `**From:** ${email.from}\n`;
+          markdownOutput += `**Body:**\n${email.body}\n\n---\n\n`; // Separator
+        });
+
+        return { content: [{ type: "text", text: markdownOutput }] };
+      } catch (error: any) {
+        return { content: [{ type: "text", text: `Error: ${error.message}` }] };
+      }
+    }
+    case "getEmailContent": {
+      if (!GMAIL_API_KEY) {
+        return { content: [{ type: "text", text: "API Key not set." }] };
+      }
+      // @ts-expect-error
+      const messageId = request.params.input.messageId;
+
+      try {
+        const messageResponse = await fetch(
+          `https://gmail.googleapis.com/gmail/v1/users/${GMAIL_USER_ID}/messages/${messageId}?format=full`,
+          { headers: { Authorization: `Bearer ${GMAIL_API_KEY}` } }
+        );
+
+        if (!messageResponse.ok) {
+          const errorData = await messageResponse.json();
+          const errorMessage =
+            errorData.error?.message || messageResponse.statusText;
+          return {
+            content: [{ type: "text", text: `Error: ${errorMessage}` }],
+          };
+        }
+
+        const fullMessage = await messageResponse.json();
+        const emailContent = await parseMessage(fullMessage);
+
         return {
-          content: [
-            { type: "text", text: JSON.stringify(emailMessages, null, 2) },
-          ],
+          content: [{ type: "text", text: JSON.stringify(emailContent) }],
         };
       } catch (error: any) {
         return { content: [{ type: "text", text: `Error: ${error.message}` }] };
@@ -114,11 +162,11 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
 async function parseMessage(message: {
   payload: {
-    headers: any;
-    parts: any[];
+    headers: { name: string; value: string }[];
+    parts: { mimeType: string; body: { data: WithImplicitCoercion<string> } }[];
     body: { data: WithImplicitCoercion<string> };
   };
-  id: any;
+  id: string;
 }) {
   const headers = message.payload.headers;
   const subject = headers.find(
