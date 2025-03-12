@@ -20,7 +20,8 @@ const EmailContentSchema = z.object({
     .number()
     .int()
     .min(1)
-    .describe("The index of the email to retrieve (1 for the first email)."),
+    .describe("The index of the email to retrieve (1 for the first email).")
+    .default(1),
 });
 
 const server = new Server(
@@ -119,11 +120,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       }
 
       try {
-        const { number } = EmailContentSchema.parse(
-          request.params.input || {
-            number: 1,
-          }
-        );
+        const { number } = EmailContentSchema.parse(request.params.input);
 
         // 1. Get List of Message IDs (up to the requested index)
         const messageListResponse = await fetch(
