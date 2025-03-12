@@ -116,7 +116,9 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       }
 
       try {
-        const { emailIndex } = EmailContentSchema.parse(request.params.input);
+        const { emailIndex } = EmailContentSchema.parse(
+          request.params.input || 1
+        );
 
         // 1. Get List of Message IDs (up to the requested index)
         const messageListResponse = await fetch(
