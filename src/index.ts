@@ -8,10 +8,16 @@ import {
 } from "@modelcontextprotocol/sdk/types.js";
 import { WithImplicitCoercion } from "buffer";
 import * as dotenv from "dotenv";
+import { z } from "zod";
+import { zodToJsonSchema } from "zod-to-json-schema";
 dotenv.config();
 
 const GMAIL_API_KEY = process.env.GMAIL_API_KEY;
 const GMAIL_USER_ID = process.env.GMAIL_USER_ID || "me";
+
+const getEmailContentSchema = z.object({
+  messageId: z.string().describe("The ID of the email to retrieve."),
+});
 
 const server = new Server(
   {
@@ -37,16 +43,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
       {
         name: "getEmailContent",
         description: "Retrieve the full content of an email from Gmail.",
-        inputSchema: {
-          type: "object",
-          properties: {
-            messageId: {
-              type: "string",
-              description: "The ID of the email to retrieve.",
-            },
-          },
-          required: ["messageId"],
-        },
+        inputSchema: zodToJsonSchema(getEmailContentSchema),
       },
     ],
   };
@@ -60,22 +57,17 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       }
 
       try {
-        // 1. Get List of Messages
         const messageListResponse = await fetch(
           `https://gmail.googleapis.com/gmail/v1/users/${GMAIL_USER_ID}/messages?maxResults=3`,
-          {
-            headers: { Authorization: `Bearer ${GMAIL_API_KEY}` },
-          }
+          { headers: { Authorization: `Bearer ${GMAIL_API_KEY}` } }
         );
 
         if (!messageListResponse.ok) {
+          const errorData = await messageListResponse.json();
+          const errorMessage =
+            errorData.error?.message || messageListResponse.statusText;
           return {
-            content: [
-              {
-                type: "text",
-                text: `Error: ${messageListResponse.statusText}`,
-              },
-            ],
+            content: [{ type: "text", text: `Error: ${errorMessage}` }],
           };
         }
 
@@ -87,22 +79,19 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
         const emailMessages = [];
 
-        // 2. Iterate and get full message for each message id.
         for (const message of messageList.messages) {
           const messageId = message.id;
-
           const messageResponse = await fetch(
             `https://gmail.googleapis.com/gmail/v1/users/${GMAIL_USER_ID}/messages/${messageId}?format=full`,
-            {
-              headers: { Authorization: `Bearer ${GMAIL_API_KEY}` },
-            }
+            { headers: { Authorization: `Bearer ${GMAIL_API_KEY}` } }
           );
 
           if (!messageResponse.ok) {
+            const errorData = await messageResponse.json();
+            const errorMessage =
+              errorData.error?.message || messageResponse.statusText;
             return {
-              content: [
-                { type: "text", text: `Error: ${messageResponse.statusText}` },
-              ],
+              content: [{ type: "text", text: `Error: ${errorMessage}` }],
             };
           }
 
@@ -110,15 +99,9 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           emailMessages.push(await parseMessage(fullMessage));
         }
 
-        // Format to Markdown
-        let markdownOutput = "";
-        emailMessages.forEach((email) => {
-          markdownOutput += `**Subject:** ${email.subject}\n`;
-          markdownOutput += `**From:** ${email.from}\n`;
-          markdownOutput += `**Body:**\n${email.body}\n\n---\n\n`; // Separator
-        });
-
-        return { content: [{ type: "text", text: markdownOutput }] };
+        return {
+          content: [{ type: "text", text: JSON.stringify(emailMessages) }],
+        };
       } catch (error: any) {
         return { content: [{ type: "text", text: `Error: ${error.message}` }] };
       }
@@ -127,8 +110,8 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       if (!GMAIL_API_KEY) {
         return { content: [{ type: "text", text: "API Key not set." }] };
       }
-      // @ts-expect-error
-      const messageId = request.params.input.messageId;
+      const getMessageId = getEmailContentSchema.parse(request.params.input);
+      const { messageId } = getMessageId;
 
       try {
         const messageResponse = await fetch(
