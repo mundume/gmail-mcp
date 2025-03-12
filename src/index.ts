@@ -15,12 +15,8 @@ dotenv.config();
 const GMAIL_API_KEY = process.env.GMAIL_API_KEY;
 const GMAIL_USER_ID = process.env.GMAIL_USER_ID || "me";
 
-const EmailContentSchema = z.object({
-  emailIndex: z
-    .number()
-    .int()
-    .min(1)
-    .describe("The index of the email to retrieve (1 for the first email)."),
+const getEmailContentSchema = z.object({
+  messageId: z.string().describe("The ID of the email to retrieve."),
 });
 
 const server = new Server(
@@ -41,16 +37,13 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
       {
         name: "listEmails",
         description:
-          "Retrieve the full content of a single email from Gmail based on its index.",
+          "List emails from Gmail with subject, sender, and body in Markdown format.",
         inputSchema: { type: "object", properties: {} },
       },
       {
         name: "getEmailContent",
         description: "Retrieve the full content of an email from Gmail.",
-        inputSchema: {
-          type: "object",
-          properties: zodToJsonSchema(EmailContentSchema),
-        },
+        inputSchema: zodToJsonSchema(getEmailContentSchema),
       },
     ],
   };
@@ -117,40 +110,10 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       if (!GMAIL_API_KEY) {
         return { content: [{ type: "text", text: "API Key not set." }] };
       }
+      const getMessageId = getEmailContentSchema.parse(request.params.input);
+      const { messageId } = getMessageId;
 
       try {
-        const { emailIndex } = EmailContentSchema.parse(
-          request.params.input || 1
-        );
-
-        // 1. Get List of Message IDs (up to the requested index)
-        const messageListResponse = await fetch(
-          `https://gmail.googleapis.com/gmail/v1/users/${GMAIL_USER_ID}/messages?maxResults=${emailIndex}`,
-          { headers: { Authorization: `Bearer ${GMAIL_API_KEY}` } }
-        );
-
-        if (!messageListResponse.ok) {
-          const errorData = await messageListResponse.json();
-          const errorMessage =
-            errorData.error?.message || messageListResponse.statusText;
-          return {
-            content: [{ type: "text", text: `Error: ${errorMessage}` }],
-          };
-        }
-
-        const messageList = await messageListResponse.json();
-
-        if (!messageList.messages || messageList.messages.length < emailIndex) {
-          return {
-            content: [
-              { type: "text", text: "Email not found at the specified index." },
-            ],
-          };
-        }
-
-        const messageId = messageList.messages[emailIndex - 1].id; // Get the ID at the requested index
-
-        // 2. Get Full Message Content
         const messageResponse = await fetch(
           `https://gmail.googleapis.com/gmail/v1/users/${GMAIL_USER_ID}/messages/${messageId}?format=full`,
           { headers: { Authorization: `Bearer ${GMAIL_API_KEY}` } }
@@ -189,8 +152,12 @@ async function parseMessage(message: {
   id: string;
 }) {
   const headers = message.payload.headers;
-  const subject = headers.find((header) => header.name === "Subject")?.value;
-  const from = headers.find((header) => header.name === "From")?.value;
+  const subject = headers.find(
+    (header: { name: string }) => header.name === "Subject"
+  )?.value;
+  const from = headers.find(
+    (header: { name: string }) => header.name === "From"
+  )?.value;
   let body = "";
 
   if (message.payload.parts) {
