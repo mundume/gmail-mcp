@@ -50,6 +50,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
 });
 
 server.setRequestHandler(CallToolRequestSchema, async (request) => {
+  console.log(request.params);
   switch (request.params.name) {
     case "listEmails": {
       if (!GMAIL_API_KEY) {
@@ -110,8 +111,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       if (!GMAIL_API_KEY) {
         return { content: [{ type: "text", text: "API Key not set." }] };
       }
-      const getMessageId = getEmailContentSchema.parse(request.params.input);
-      const { messageId } = getMessageId;
+      const { messageId } = getEmailContentSchema.parse(request.params.input);
 
       try {
         const messageResponse = await fetch(
