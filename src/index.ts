@@ -15,15 +15,6 @@ dotenv.config();
 const GMAIL_API_KEY = process.env.GMAIL_API_KEY;
 const GMAIL_USER_ID = process.env.GMAIL_USER_ID || "me";
 
-const EmailContentSchema = z.object({
-  number: z
-    .number()
-    .int()
-    .min(1)
-    .describe("The index of the email to retrieve (1 for the first email).")
-    .default(1),
-});
-
 const server = new Server(
   {
     name: "gmail-email-lister",
@@ -50,7 +41,13 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
           "Retrieve the full content of an email from Gmail by its index.",
         inputSchema: {
           type: "object",
-          properties: zodToJsonSchema(EmailContentSchema),
+          properties: {
+            emailIndex: {
+              type: "number",
+              description:
+                "The index of the email to retrieve (1 for the first email).",
+            },
+          },
         },
       },
     ],
@@ -120,11 +117,12 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       }
 
       try {
-        const { number } = EmailContentSchema.parse(request.params.input);
+        // @ts-expect-error
+        const { emailIndex } = request.params.input;
 
         // 1. Get List of Message IDs (up to the requested index)
         const messageListResponse = await fetch(
-          `https://gmail.googleapis.com/gmail/v1/users/${GMAIL_USER_ID}/messages?maxResults=${number}`,
+          `https://gmail.googleapis.com/gmail/v1/users/${GMAIL_USER_ID}/messages?maxResults=${emailIndex}`,
           { headers: { Authorization: `Bearer ${GMAIL_API_KEY}` } }
         );
 
@@ -139,7 +137,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
         const messageList = await messageListResponse.json();
 
-        if (!messageList.messages || messageList.messages.length < number) {
+        if (!messageList.messages || messageList.messages.length < emailIndex) {
           return {
             content: [
               { type: "text", text: "Email not found at the specified index." },
@@ -147,7 +145,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           };
         }
 
-        const messageId = messageList.messages[number - 1].id; // Get the ID at the requested index
+        const messageId = messageList.messages[emailIndex - 1].id; // Get the ID at the requested index
 
         // 2. Get Full Message Content
         const messageResponse = await fetch(
