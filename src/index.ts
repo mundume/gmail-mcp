@@ -8,7 +8,7 @@ import {
 } from "@modelcontextprotocol/sdk/types.js";
 import { WithImplicitCoercion } from "buffer";
 import * as dotenv from "dotenv";
-import { z } from "zod";
+import { number, z } from "zod";
 import { zodToJsonSchema } from "zod-to-json-schema";
 dotenv.config();
 
@@ -16,7 +16,7 @@ const GMAIL_API_KEY = process.env.GMAIL_API_KEY;
 const GMAIL_USER_ID = process.env.GMAIL_USER_ID || "me";
 
 const EmailContentSchema = z.object({
-  emailIndex: z
+  number: z
     .number()
     .int()
     .min(1)
@@ -40,14 +40,17 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
     tools: [
       {
         name: "listEmails",
-        description:
-          "Retrieve the full content of a single email from Gmail based on its index.",
+        description: "List the first 10 emails in your Gmail account.",
         inputSchema: { type: "object", properties: {} },
       },
       {
         name: "getEmailContent",
-        description: "Retrieve the full content of an email from Gmail.",
-        inputSchema: zodToJsonSchema(EmailContentSchema),
+        description:
+          "Retrieve the full content of an email from Gmail by its index.",
+        inputSchema: {
+          type: "object",
+          properties: zodToJsonSchema(EmailContentSchema),
+        },
       },
     ],
   };
@@ -116,13 +119,15 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       }
 
       try {
-        const { emailIndex } = EmailContentSchema.parse(
-          request.params.input || 1
+        const { number } = EmailContentSchema.parse(
+          request.params.input || {
+            number: 1,
+          }
         );
 
         // 1. Get List of Message IDs (up to the requested index)
         const messageListResponse = await fetch(
-          `https://gmail.googleapis.com/gmail/v1/users/${GMAIL_USER_ID}/messages?maxResults=${emailIndex}`,
+          `https://gmail.googleapis.com/gmail/v1/users/${GMAIL_USER_ID}/messages?maxResults=${number}`,
           { headers: { Authorization: `Bearer ${GMAIL_API_KEY}` } }
         );
 
@@ -137,7 +142,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
         const messageList = await messageListResponse.json();
 
-        if (!messageList.messages || messageList.messages.length < emailIndex) {
+        if (!messageList.messages || messageList.messages.length < number) {
           return {
             content: [
               { type: "text", text: "Email not found at the specified index." },
@@ -145,7 +150,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           };
         }
 
-        const messageId = messageList.messages[emailIndex - 1].id; // Get the ID at the requested index
+        const messageId = messageList.messages[number - 1].id; // Get the ID at the requested index
 
         // 2. Get Full Message Content
         const messageResponse = await fetch(
