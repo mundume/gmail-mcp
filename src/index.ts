@@ -26,6 +26,12 @@ const EmailFilterSchema = z.object({
       "The search query to filter emails. Use 'in:inbox', 'in:sent', or 'in:draft' to filter by label."
     ),
 });
+const SendEmailSchema = z.object({
+  to: z.string().email().describe("Recipient email address."),
+  cc: z.string().optional().describe("CC"),
+  subject: z.string().describe("Email subject."),
+  body: z.string().describe("Email body."),
+});
 
 const server = new Server(
   {
@@ -234,6 +240,55 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
         return {
           content: [{ type: "text", text: JSON.stringify(emailMessages) }],
+        };
+      } catch (error: any) {
+        return { content: [{ type: "text", text: `Error: ${error.message}` }] };
+      }
+    }
+    case "sendEmail": {
+      if (!GMAIL_API_KEY) {
+        return { content: [{ type: "text", text: "API Key not set." }] };
+      }
+
+      try {
+        const { to, cc, subject, body } = SendEmailSchema.parse(
+          request.params.arguments
+        );
+
+        let emailHeaders = `To: ${to}\r\n`;
+        if (cc) {
+          emailHeaders += `Cc: ${cc}\r\n`;
+        }
+        emailHeaders += `Subject: ${subject}\r\nContent-Type: text/plain; charset=utf-8\r\n\r\n`;
+
+        const raw = Buffer.from(emailHeaders + body)
+          .toString("base64")
+          .replace(/\+/g, "-")
+          .replace(/\//g, "_")
+          .replace(/=+$/, "");
+
+        const response = await fetch(
+          `https://gmail.googleapis.com/gmail/v1/users/${GMAIL_USER_ID}/messages/send`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${GMAIL_API_KEY}`,
+            },
+            body: JSON.stringify({ raw: raw }),
+          }
+        );
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          const errorMessage = errorData.error?.message || response.statusText;
+          return {
+            content: [{ type: "text", text: `Error: ${errorMessage}` }],
+          };
+        }
+
+        return {
+          content: [{ type: "text", text: "Email sent successfully." }],
         };
       } catch (error: any) {
         return { content: [{ type: "text", text: `Error: ${error.message}` }] };
