@@ -56,7 +56,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
       {
         name: "filterEmails",
         description: "Filter emails from Gmail based on a search query.",
-        inputSchema: zodToJsonSchema(EmailIndexSchema),
+        inputSchema: zodToJsonSchema(EmailFilterSchema),
       },
     ],
   };
