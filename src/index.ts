@@ -28,7 +28,7 @@ const EmailFilterSchema = z.object({
 });
 const SendEmailSchema = z.object({
   to: z.string().email().describe("Recipient email address."),
-  cc: z.string().optional().describe("CC"),
+  cc: z.string().email().optional().describe("CC recipient email address."),
   subject: z.string().describe("Email subject."),
   body: z.string().describe("Email body."),
 });
@@ -63,6 +63,11 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
         name: "filterEmails",
         description: "Filter emails from Gmail based on a search query.",
         inputSchema: zodToJsonSchema(EmailFilterSchema),
+      },
+      {
+        name: "sendEmail",
+        description: "Send an email from Gmail.",
+        inputSchema: zodToJsonSchema(SendEmailSchema),
       },
     ],
   };
