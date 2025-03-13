@@ -19,6 +19,14 @@ const EmailIndexSchema = z.object({
   emailIndex: z.number().describe("The index of the email to retrieve."),
 });
 
+const EmailFilterSchema = z.object({
+  query: z
+    .string()
+    .describe(
+      "The search query to filter emails. Use 'in:inbox', 'in:sent', or 'in:draft' to filter by label."
+    ),
+});
+
 const server = new Server(
   {
     name: "gmail-email-lister",
@@ -43,6 +51,11 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
       {
         name: "getEmailContent",
         description: "Retrieve the full content of an email from Gmail.",
+        inputSchema: zodToJsonSchema(EmailIndexSchema),
+      },
+      {
+        name: "filterEmails",
+        description: "Filter emails from Gmail based on a search query.",
         inputSchema: zodToJsonSchema(EmailIndexSchema),
       },
     ],
@@ -162,6 +175,65 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
         return {
           content: [{ type: "text", text: JSON.stringify(emailContent) }],
+        };
+      } catch (error: any) {
+        return { content: [{ type: "text", text: `Error: ${error.message}` }] };
+      }
+    }
+    case "filterEmails": {
+      if (!GMAIL_API_KEY) {
+        return { content: [{ type: "text", text: "API Key not set." }] };
+      }
+
+      try {
+        const { query } = EmailFilterSchema.parse(request.params.arguments);
+
+        const messageListResponse = await fetch(
+          `https://gmail.googleapis.com/gmail/v1/users/${GMAIL_USER_ID}/messages?q=${encodeURIComponent(
+            query
+          )}&maxResults=10`,
+          { headers: { Authorization: `Bearer ${GMAIL_API_KEY}` } }
+        );
+
+        if (!messageListResponse.ok) {
+          const errorData = await messageListResponse.json();
+          const errorMessage =
+            errorData.error?.message || messageListResponse.statusText;
+          return {
+            content: [{ type: "text", text: `Error: ${errorMessage}` }],
+          };
+        }
+
+        const messageList = await messageListResponse.json();
+
+        if (!messageList.messages) {
+          return { content: [{ type: "text", text: "No messages found." }] };
+        }
+
+        const emailMessages = [];
+
+        for (const message of messageList.messages) {
+          const messageId = message.id;
+          const messageResponse = await fetch(
+            `https://gmail.googleapis.com/gmail/v1/users/${GMAIL_USER_ID}/messages/${messageId}?format=full`,
+            { headers: { Authorization: `Bearer ${GMAIL_API_KEY}` } }
+          );
+
+          if (!messageResponse.ok) {
+            const errorData = await messageResponse.json();
+            const errorMessage =
+              errorData.error?.message || messageResponse.statusText;
+            return {
+              content: [{ type: "text", text: `Error: ${errorMessage}` }],
+            };
+          }
+
+          const fullMessage = await messageResponse.json();
+          emailMessages.push(await parseMessage(fullMessage));
+        }
+
+        return {
+          content: [{ type: "text", text: JSON.stringify(emailMessages) }],
         };
       } catch (error: any) {
         return { content: [{ type: "text", text: `Error: ${error.message}` }] };
