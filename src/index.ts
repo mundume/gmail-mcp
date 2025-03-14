@@ -28,7 +28,6 @@ const EmailFilterSchema = z.object({
 });
 const SendEmailSchema = z.object({
   to: z.string().email().describe("Recipient email address."),
-  cc: z.string().email().optional().describe("CC recipient email address."),
   subject: z.string().describe("Email subject."),
   body: z.string().describe("Email body."),
 });
@@ -256,21 +255,19 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       }
 
       try {
-        const { to, cc, subject, body } = SendEmailSchema.parse(
+        const { to, subject, body } = SendEmailSchema.parse(
           request.params.arguments
         );
 
-        let emailHeaders = `To: ${to}\r\n`;
-        if (cc) {
-          emailHeaders += `Cc: ${cc}\r\n`;
-        }
-        emailHeaders += `Subject: ${subject}\r\nContent-Type: text/plain; charset=utf-8\r\n\r\n`;
+        let emailHeaders = `To: ${to}\r\nSubject: ${subject}\r\nContent-Type: text/plain; charset=utf-8\r\n\r\n`;
 
         const raw = Buffer.from(emailHeaders + body)
           .toString("base64")
           .replace(/\+/g, "-")
           .replace(/\//g, "_")
           .replace(/=+$/, "");
+
+        console.log("Raw message:", raw); // Debugging: Log the raw message
 
         const response = await fetch(
           `https://gmail.googleapis.com/gmail/v1/users/${GMAIL_USER_ID}/messages/send`,
@@ -286,6 +283,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
         if (!response.ok) {
           const errorData = await response.json();
+          console.error("Gmail API Error:", errorData); // Debugging: Log the full error
           const errorMessage = errorData.error?.message || response.statusText;
           return {
             content: [{ type: "text", text: `Error: ${errorMessage}` }],
