@@ -32,20 +32,6 @@ const SendEmailSchema = z.object({
   body: z.string().describe("Email body."),
 });
 
-const SummarizeEmailsSchema = z.object({
-  query: z
-    .string()
-    .describe(
-      "The search query to filter emails. Use 'in:inbox', 'in:sent', or 'in:draft' to filter by label."
-    )
-    .default("in:inbox"),
-  maxResults: z
-    .number()
-    .optional()
-    .describe("The maximum number of emails to retrieve.")
-    .default(10),
-});
-
 const ListEmailsSchema = z.object({
   query: z
     .string()
@@ -92,12 +78,12 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
         description: "Filter emails from Gmail based on a search query.",
         inputSchema: zodToJsonSchema(EmailFilterSchema),
       },
-      // {
-      //   name: "sendEmail",
-      //   description: "Send an email from Gmail.",
-      //   inputSchema: zodToJsonSchema(SendEmailSchema),
-      // },
-      // {
+      {
+        name: "sendEmail",
+        description: "Send an email from Gmail.",
+        inputSchema: zodToJsonSchema(SendEmailSchema),
+      },
+
       //   name: "summarizeEmails",
       //   description: "Generate a summary of emails from Gmail.",
       //   inputSchema: zodToJsonSchema(SummarizeEmailsSchema),
@@ -249,7 +235,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           .replace(/\//g, "_")
           .replace(/=+$/, "");
 
-        console.log("Raw message:", raw); // Debugging: Log the raw message
+        console.log("Raw message:", raw);
 
         const response = await fetch(
           `https://gmail.googleapis.com/gmail/v1/users/${GMAIL_USER_ID}/messages/send`,
