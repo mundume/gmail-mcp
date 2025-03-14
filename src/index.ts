@@ -19,13 +19,6 @@ const EmailIndexSchema = z.object({
   emailIndex: z.number().describe("The index of the email to retrieve."),
 });
 
-const EmailFilterSchema = z.object({
-  query: z
-    .string()
-    .describe(
-      "The search query to filter emails. Use 'in:inbox', 'in:sent', or 'in:draft' to filter by label."
-    ),
-});
 const SendEmailSchema = z.object({
   to: z.string().email().describe("Recipient email address."),
   subject: z.string().describe("Email subject."),
@@ -36,10 +29,11 @@ const ListEmailsSchema = z.object({
   query: z
     .string()
     .describe(
-      "The search query to filter emails. Use 'in:inbox', 'in:sent', or 'in:draft' to filter by label."
+      "The search query to filter emails. Use 'in:inbox','in:spam' 'in:unread', 'in:starred', 'in:sent', 'in:all', 'in:category_social', 'in:category_promotions', 'in:category_updates', 'in:category_forums', 'in:primary' or 'in:draft' to filter by label."
     )
     .optional()
     .default("in:inbox"),
+
   maxResults: z
     .number()
     .optional()
@@ -65,7 +59,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
       {
         name: "listEmails",
         description:
-          "List emails from Gmail with subject, sender, and body in Markdown format. Optionally filter and limit results.",
+          "List emails from Gmail with subject, sender, and body in Markdown format. Optionally filter and summarize results.",
         inputSchema: zodToJsonSchema(ListEmailsSchema),
       },
       {
@@ -74,20 +68,10 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
         inputSchema: zodToJsonSchema(EmailIndexSchema),
       },
       {
-        name: "filterEmails",
-        description: "Filter emails from Gmail based on a search query.",
-        inputSchema: zodToJsonSchema(EmailFilterSchema),
-      },
-      {
         name: "sendEmail",
         description: "Send an email from Gmail.",
         inputSchema: zodToJsonSchema(SendEmailSchema),
       },
-
-      //   name: "summarizeEmails",
-      //   description: "Generate a summary of emails from Gmail.",
-      //   inputSchema: zodToJsonSchema(SummarizeEmailsSchema),
-      // },
     ],
   };
 });
