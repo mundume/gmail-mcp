@@ -32,6 +32,20 @@ const SendEmailSchema = z.object({
   body: z.string().describe("Email body."),
 });
 
+const SummarizeEmailsSchema = z.object({
+  query: z
+    .string()
+    .describe(
+      "The search query to filter emails. Use 'in:inbox', 'in:sent', or 'in:draft' to filter by label."
+    )
+    .default("in:inbox"),
+  maxResults: z
+    .number()
+    .optional()
+    .describe("The maximum number of emails to retrieve.")
+    .default(10),
+});
+
 const server = new Server(
   {
     name: "gmail-email-lister",
@@ -67,6 +81,11 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
         name: "sendEmail",
         description: "Send an email from Gmail.",
         inputSchema: zodToJsonSchema(SendEmailSchema),
+      },
+      {
+        name: "summarizeEmails",
+        description: "Generate a summary of emails from Gmail.",
+        inputSchema: zodToJsonSchema(SummarizeEmailsSchema),
       },
     ],
   };
@@ -292,6 +311,67 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
         return {
           content: [{ type: "text", text: "Email sent successfully." }],
+        };
+      } catch (error: any) {
+        return { content: [{ type: "text", text: `Error: ${error.message}` }] };
+      }
+    }
+    case "summarizeEmails": {
+      if (!GMAIL_API_KEY) {
+        return { content: [{ type: "text", text: "API Key not set." }] };
+      }
+
+      try {
+        const { query, maxResults } = SummarizeEmailsSchema.parse(
+          request.params.arguments
+        );
+
+        const messageListResponse = await fetch(
+          `https://gmail.googleapis.com/gmail/v1/users/${GMAIL_USER_ID}/messages?q=${encodeURIComponent(
+            query
+          )}&maxResults=${maxResults}`,
+          { headers: { Authorization: `Bearer ${GMAIL_API_KEY}` } }
+        );
+
+        if (!messageListResponse.ok) {
+          const errorData = await messageListResponse.json();
+          const errorMessage =
+            errorData.error?.message || messageListResponse.statusText;
+          return {
+            content: [{ type: "text", text: `Error: ${errorMessage}` }],
+          };
+        }
+
+        const messageList = await messageListResponse.json();
+
+        if (!messageList.messages) {
+          return { content: [{ type: "text", text: "No messages found." }] };
+        }
+
+        const emailMessages = [];
+
+        for (const message of messageList.messages) {
+          const messageId = message.id;
+          const messageResponse = await fetch(
+            `https://gmail.googleapis.com/gmail/v1/users/${GMAIL_USER_ID}/messages/${messageId}?format=full`,
+            { headers: { Authorization: `Bearer ${GMAIL_API_KEY}` } }
+          );
+
+          if (!messageResponse.ok) {
+            const errorData = await messageResponse.json();
+            const errorMessage =
+              errorData.error?.message || messageResponse.statusText;
+            return {
+              content: [{ type: "text", text: `Error: ${errorMessage}` }],
+            };
+          }
+
+          const fullMessage = await messageResponse.json();
+          emailMessages.push(await parseMessage(fullMessage));
+        }
+
+        return {
+          content: [{ type: "text", text: JSON.stringify(emailMessages) }],
         };
       } catch (error: any) {
         return { content: [{ type: "text", text: `Error: ${error.message}` }] };
